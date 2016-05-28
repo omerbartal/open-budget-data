@@ -146,6 +146,9 @@ class company_numbers_scraper:
     def __iter__(self):
         return self.indexes.__iter__()
 
+    def __len__(self):
+        return len(self.indexes)
+
 def test():
     import csv
     w = csv.writer(open('1.csv', 'w'))
@@ -163,6 +166,7 @@ def test():
 def extract_all(company_numbers_filename, csv_filename=None, json_filename=None):
     import csv
     import json
+    import time
 
     print "extracting company ids..."
     company_numbers = company_numbers_scraper(company_numbers_filename)
@@ -175,9 +179,16 @@ def extract_all(company_numbers_filename, csv_filename=None, json_filename=None)
     if json_filename:
         json_file = open(json_filename,'w')
 
-    for n in company_numbers:
+    start_time = time.time()
+    for i, n in enumerate(company_numbers):
         url = 'http://maya.tase.co.il/bursa/CompanyDetails.asp?CompanyCd=%d' % (n)
         company = company_details_scraper(url)
+        end_time = time.time()
+
+        time_per_company = (end_time-start_time) / (i+1)
+        companies_left = len(company_numbers) - (i+1)
+        time_left = time_per_company * companies_left
+        print '%d/%d %d seconds left' % (i+1, len(company_numbers), time_left)
         print company.company_name, company.company_id, len(company.jobs)
 
         for job in company.jobs:
