@@ -2,9 +2,22 @@
 import requesocks as requests
 from scrapy.selector import Selector
 import os
+import urllib3
 
 class NoSuchElementException(Exception):
     pass
+
+expected_exceptions = (urllib3.exceptions.ReadTimeoutError, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.SSLError, requests.exceptions.Timeout, NoSuchElementException)
+
+def handle_expected_exceptions( i, msg, max_retrys=None ):
+    print msg
+
+    if max_retrys is not None:
+        if i >= max_retrys:
+            print "not retrying again"
+            raise
+
+    sleep_retry( i )
 
 class company_details_scraper:
     def __init__(self, url):
@@ -126,7 +139,7 @@ class company_numbers_scraper:
                 break
             except Exception,e:
                 i += 1
-                handle_expected_exceptions( i, "search_web_page.request: Got %s, retrying (%d)" % (repr(e),i), max_retrys=3 )
+                handle_expected_exceptions( i, "search_web_page.request: Got %s, retrying (%d)" % (repr(e),i), max_retrys=10 )
                 
         f = open(self.save_path,'w')
         f.write(self.response.content)
@@ -182,7 +195,19 @@ def extract_all(company_numbers_filename, csv_filename=None, json_filename=None)
     start_time = time.time()
     for i, n in enumerate(company_numbers):
         url = 'http://maya.tase.co.il/bursa/CompanyDetails.asp?CompanyCd=%d' % (n)
-        company = company_details_scraper(url)
+
+
+        download_iter = 0
+        while True:
+            try:
+                company = company_details_scraper(url)
+                break
+            except expected_exceptions, e:
+                download_iter += 1
+                handle_expected_exceptions( download_iter, "extract_all: Got %s, retrying (%d)" % (repr(e),download_iter) )
+
+
+
         end_time = time.time()
 
         time_per_company = (end_time-start_time) / (i+1)
